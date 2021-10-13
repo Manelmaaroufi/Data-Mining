@@ -1,0 +1,552 @@
+---
+title: "Datamining "
+author: "1ba2 "
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    social: menu
+    source_code: embed
+    
+---
+Introduction
+===============================================================
+
+Cardiovascular diseases (CVDs) are the number 1 cause of death globally, taking an estimated 17.9 million lives each year, which accounts for 31% of all deaths worldwide.
+
+*Problematic and solution :
+
+Heart failure is a common event caused by CVDs ,and this dataset contains 11 features that can be used to predict mortality by heart failure. 
+
+Based on personal files, health analyses, and lifestyle of 299 patients. We will predict whom may live (probability =death event = 1), and whom may not (p = 0).
+
+                                         
+                                           
+                                           
+*The 11 features are : 
+age , anaemia , creatinine_phosphokinase, diabetes , ejection_fraction , high_blood_pressure , platelets serum_creatinine , serum_sodium , sex , smoking   
+
+                                          
+
+*Explanation of most non obvious features(used in the exploration):
+
+
+   * The ejection fraction: is the percentage of ejection of the blood contained in a heart cavity during a beat.
+
+   * Persistent arterial hypertension (hypertension) is a cardiovascular pathology defined by too high blood pressure.
+
+
+  * Sodium helps keep blood pressure at normal levels, and it supports the functioning of nerves and muscles and regulates water balance in the body.
+
+
+  *platelets:The smallest blood cells, but they perform a major vital function
+
+
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(ggplot2)
+library(FactoMineR)
+library(corrgram)
+library(corrplot)
+library(factoextra)
+library(plotly)
+library(shiny)
+```
+
+```{r include=FALSE}
+df=read.csv((file = file.choose()),header = TRUE,sep = ';')
+View(df)
+str(df)
+colnames(df)
+```
+
+
+```{r}
+library(dplyr)
+attach(df)
+df = mutate(df, anaemia  = as.factor(anaemia))
+df = mutate(df, diabetes = as.factor(diabetes))
+df = mutate(df, high_blood_pressure=as.factor(high_blood_pressure))
+df = mutate(df, sex = as.factor(sex))
+df = mutate(df, smoking = as.factor(smoking))
+df = mutate(df, age = as.integer (age))
+```
+ 
+
+
+Description
+========================================================================
+row
+-------------------------------------------------
+### STR
+```{r echo=FALSE}
+str(df)
+```
+
+
+### Description :
+
+the dataset that contains 11 variables and 299 observations ,divided between 6 quantitative variables (age, creatinine_phosphokinase, ejection_fraction, platelets, serum_creatinin, serum_sodium),
+and 5 labeled categorical (0,1) variables  (anaemia, diabetes, high_blood_pressure, sex, smoking).
+
+Explanation of variables:
+
+* anaemia : 0 = NO / 1= YES
+* diabetes : 0 = NO / 1 = YES
+* high_blood_pressure: 0 = NO / 1= YES
+* sex : 0 = FEMME / 1 = HOMME
+* smoking : 0 = NO / 1 = YES
+
+
+Exploratory
+========================================================================
+row
+------------------------------------------------------------------------
+### smoking/Age
+
+
+The proportion of women and men who are non-smokers is non-proportional.
+The proportion of smokers between men and women is not equal.
+
+the age group of female smokers: from 68 to 70 
+
+the age group of male smokers: from 50 to 70 (almost)
+*for men : The earlier the onset, the stronger the addiction and the harder it is to quit
+
+
+```{r echo=FALSE, message=FALSE}
+xx=ggplot(df,aes(x=smoking,y=age,fill=sex))+geom_boxplot()
+ggplotly(xx)
+
+```
+
+### ejection_fraction / Platelets
+
+-It is of the order of 45 to 70% in the normal individual (typical normal value: 60%)
+women without diabetes have higher cardio efficiency than men, in the range of 46 to 50%.
+
+* diabetes will reduce the 'cardio efficiency' to 10-15%, (often responsible for heart failure)
+
+```{r}
+pp=ggplot(df,aes(x=diabetes,y=ejection_fraction,fill=sex))+geom_boxplot()
+ggplotly(pp)
+
+```
+
+
+Row
+-------------------------------------
+### Diabetes/ High blood pressure
+
+*People with high blood pressure are at risk of developing diabetes
+*People with diabetes also have an increased risk of high blood pressure.
+
+```{r}
+a= table(df$high_blood_pressure,df$diabetes)
+mosaicplot(a,main = 'Mosaicplot Diabetes/High blood pressure',xlab = 'Diabetes',ylab ='High blood pressure' ,color = c('blue','red'))
+```
+
+
+### Age/Serum_sodium
+-The normal level of sodium in the blood is between 135 and 145 milliequivalents per liter.
+
+The linear regression Age/Serum_sodium,  has a decreasing trend: 
+*With age, the body is less able to maintain water and sodium balance
+
+```{r message=FALSE, warning=FALSE}
+a= ggplot(df,aes(x=df$age,y=df$serum_sodium))+ geom_point() + geom_smooth(method = lm)
+ggplotly(a)
+```
+
+
+### Corrgramm
+
+```{r}
+df=lapply(df,FUN = as.numeric)
+df=as.data.frame(df)
+```
+
+
+The corrgram(of all quantitative variables) indicates ,that the variable smoking and age are moderately correlated, (0.45):therefore one of the variables has a significant effect on the other.
+```{r}
+corrgram(df,order = TRUE,lower.panel = panel.conf)
+```
+
+
+Principal component Analysis 
+========================
+row(1)
+-----------------------------------------------------------------------
+```{r}
+res.pca=PCA(df,ncp = 13 , quali.sup = c(2,4,6,10,11),graph = FALSE)
+```
+
+
+### Eiguen Value
+
+```{r echo=FALSE}
+res.pca$eig
+```
+
+
+Quality of representation
+
+
+```{r echo=FALSE}
+res.pca$var$cos2
+```
+
+Correlation of each variable with its corresponding dimensions 
+
+```{r echo=FALSE}
+res.pca$var$cor
+```
+
+
+Contribution of each variable in the creation of dimensions
+```{r}
+res.pca$var$contrib
+```
+
+Analyse :
+ 
+ 
+  * Eiguen-Value:
+ 
+According to the table of eigenvalues, we can decompose our database into 6 dimensions, with eigenvalues ranging from 1.3452486 to 0.7293572.
+ 
+Each dimension has a percentage of inertia (compared to the total infromation of the whole data set):
+
+*the first=22.42% 
+*the second dimension = 19.22%
+*the third dimension =16.45%
+*the fourth dimension= 16.01%,
+*the fifth dimension = 13.72%
+*the last = 12.15%
+ 
+ 
+   * COS2 (quality of the  representation)
+ 
+- Age is well represented on the 2nd and 5th dimensions
+- Creatinine-phosphikinase: is well represented on dim 3 and 4.
+- ejection_fraction: well represented on dim 2 (44.26) and dim 5 (28.18)
+-platelets: well represented on dimensions 3 and 4, (39.66 and 42.93)
+- serum_creatinine and serum_sodium: well represented on dimensions 1 and
+
+
+ 
+  * Contrib :
+  
+Analyzing the contribution of each variable in the creation of each axis.
+
+The most contributed variables in the creation of the :
+ 
+ 
+  - dim 1: Serum_Creatinine, Serum_Sodium
+  - dime 2: Age, ejection_fraction
+  - dim 3: creatinine_phosphokenase, platelets
+  - dim 4: platelets, creatinine
+  - dim 5: Age, ejection_fraction
+  - dim 6: .Serum_Creatinine, Serum_Sodium
+ 
+ 
+
+Visualisation PCA
+===============================
+
+Row
+------------------------------------
+### Graph des individus sur les axes (1,2)
+
+```{r}
+fviz_pca_ind(res.pca,axes = c(1,2),habillage = c(10
+                                                 ))
+View(df)
+```
+ 
+
+### Graph des variables sur l'axes(1,2)
+```{r}
+fviz_pca_var(res.pca,axes = c(1,2),col.var = "blue",col.circle = "red")
+```
+
+
+
+
+
+row
+---------------------------------------------------------
+### Critère de Coude
+```{r}
+fviz_screeplot(res.pca,ncp=6)+theme_classic()
+```
+
+
+### Critère de Kaiser 
+```{r}
+res.pca$eig
+```
+
+
+Row
+-----------------------------------------------------
+### Analyse
+According to the 'Coude' criterion we could not determine the best dimensions to retain.
+The "Coude" criterion graph does not show a significant drop.
+
+By using the Kaiser criterion (as being a second solution), we will choose the dimensions which have an eigenvalue greater than 1:
+
+We choose the first two dimensions, which have eigenvalues equal to  1.34, and 1.15. 
+its percentages of inertia are respectively equal to 22.42% and 19.22.
+
+Considering that ,the components 3, 4, and 4 ,have almost eigenvalues very close to 1.
+
+
+
+
+
+Ascending and Hierarchical Classification
+========================================================
+
+
+row
+-----------------------------------------------
+```{r}
+library(clValid)
+library(cluster)
+```
+
+```{r}
+X=df
+X=as.matrix(X)
+X=scale(X)
+rownames(X) = 1:nrow(X)
+intern=clValid(X,2:6,clMethods = c("hierarchical", "kmeans", "diana"),
+               validation="internal")
+```
+
+
+### Résultat de validation
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+summary(intern)
+optimalScores(intern)
+```
+
+ Visualisation
+
+```{r}
+plot(intern)
+```
+
+
+ACH 
+=======================================================
+
+Row
+---------------------------------------------------
+
+```{r include=FALSE}
+df1=scale(df)
+d=dist(df1,method = "euclidean")
+CH=hclust(d,method = "ward.D")
+```
+
+### Effet de Coude 
+
+ it  proposed to make a clustering, composed of two (and only) clusters
+```{r}
+Variance=sort(CH$height,decreasing = TRUE)
+plot(rev(CH$height),type='b')
+```
+
+### Hierarchical tree
+
+```{r}
+dend=fviz_dend(CH,k=2,rect = TRUE,k_colors = c('red','blue'),main = 'Classification ascendante et hiérarhique')
+dend
+```
+
+Combining the predicted variable 'Death' (basing on the clustering results) and the data frame 'df',in a new one named 'df4' 
+
+```{r}
+Death=cutree(CH,k=2)
+df4=cbind.data.frame(df,Death)
+df4$Death[df4$Death == 1] <- "0"
+df4$Death[df4$Death == 2] <- "1"
+View(df4)
+```
+```{r}
+df4$Death=as.numeric(df4$Death)
+
+```
+
+
+LR
+=============================================
+
+row
+------------------------------------------------
+
+
+
+
+
+### Model-complet
+the most significant variables are:
+ 
+creatinine_phosphokinase
+ejection_fraction
+tuxedo
+
+
+moderately significant variables:
+high_blood_pressure
+serum_creatinin
+sex
+
+```{r}
+model_complet <- glm(Death ~ ., data=df4, family = binomial)
+summary(model_complet)
+```
+
+
+
+
+
+Backword
+the way to select the right model: Backward:
+We start with all the available variables and we remove the non-significant variables as we go.
+
+Step:  AIC=129.04(minimul)
+Death ~ anaemia + creatinine_phosphokinase + ejection_fraction + 
+    high_blood_pressure + platelets + serum_creatinine + serum_sodium + 
+    sex + smoking
+
+```{r}
+library(MASS)
+modele.backward <- stepAIC(model_complet,~., trace = TRUE, data = df4, direction = "backward")
+```
+
+
+
+
+
+
+
+
+
+Prediction
+
+1.Test and training sample 80% training sample and 20% test sample
+
+```{r}
+x<-sample(c(1:nrow(df4)), 0.8*nrow(df4))
+
+training=df4[x,]
+test=df4[-x,]
+test
+```
+
+
+
+
+
+
+
+Elimination of the "death" column
+```{r}
+test2=test[,-12]
+test2
+```
+
+
+
+
+
+
+
+
+
+
+
+application of the chosen model on the training data the best model:
+
+Step:  AIC=97.45 (minimul one )
+Death ~ creatinine_phosphokinase + ejection_fraction + high_blood_pressure + 
+    platelets + serum_creatinine + serum_sodium + sex + smoking
+
+```{r}
+model_train <- glm(Death~ ., data=training, family = binomial)
+summary(model_train)
+```
+
+
+
+
+
+
+
+```{r message=FALSE, warning=FALSE}
+modele_select_train <- step(model_train, direction="backward")
+```
+
+
+
+
+
+
+
+pred_test=y_predict
+```{r}
+pred_test <- predict(modele_select_train, newdata = test2, type="response")
+pred_test>0.5
+```
+
+
+
+
+
+
+
+
+
+display of predict values
+```{r}
+pred_test <- as.numeric(pred_test>0.5)
+pred_test
+```
+
+
+
+
+
+
+the number of p (0) and p (1) / from the test output
+```{r}
+table(test$Death)
+```
+
+for p = 1, the model failed in 5 observations
+for p = 0, the model has incorrectly expressed 2 observations
+
+
+
+
+
+
+model to remember
+```{r}
+table(test$Death,pred_test )
+```
+
+
+
+
+
+
+
+Recommendation /Advice :
+
+    *Most cardiovascular diseases can be prevented by addressing behavioral risk factors such as tobacco use, unhealthy diet and obesity, physical inactivity and harmful use of alcohol using population-wide strategies.
+
+    *People with cardiovascular disease or who are at high cardiovascular risk (due to the presence of one or more risk factors such as hypertension, diabetes, hyperlipidaemia or already established disease) need early detection and management wherein a machine learning model can be of great help.
